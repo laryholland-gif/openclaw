@@ -1,18 +1,11 @@
 {
-  "fallbackKeys": [
-    "usage.providerUsage.balance",
-    "usage.providerUsage.budget",
-    "usage.providerUsage.remaining",
-    "usage.providerUsage.resets",
-    "usage.providerUsage.subtitle",
-    "usage.providerUsage.title"
-  ],
+  "fallbackKeys": [],
   "generatedAt": "2026-07-05T23:37:58.832Z",
   "locale": "hi",
   "model": "claude-opus-4-8",
   "provider": "anthropic",
   "sourceHash": "a2c31f4b308513f82515145c43c887a85f36aecbbfbed85175b4514c073968fb",
   "totalKeys": 1542,
-  "translatedKeys": 1536,
+  "translatedKeys": 1542,
   "workflow": 1
 }
