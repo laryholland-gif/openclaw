@@ -11,8 +11,18 @@ read_when:
 
 Draft planning specification.
 
-GitHub issue tracking is pending. Use the `feature/channel-context-memory`
-branch as the first source of truth.
+GitHub issue tracking is pending. Use Lary's fork branch
+`feature/channel-context-memory` as the first source of truth. The local
+source-of-truth checkout is currently
+`/root/.openclaw/workspace/openclaw-channel-context-memory-fork` on
+`feature/channel-context-memory-fork`, tracking
+`lary-fork/feature/channel-context-memory`.
+
+The branch is intentionally based on `lary-fork/main` for the collaboration
+anchor. Do not blindly rebase this branch onto `origin/main` unless the GitHub
+token has workflow-file push scope or a separate upstream-facing branch is
+being prepared; an upstream-main-based push previously failed because the token
+could not push workflow-file history.
 
 ## Goal
 
@@ -407,14 +417,21 @@ After Telegram wiring:
 
 ## Implementation phases
 
-1. Add the shared `channel_context` source type and retrieval-time config
-   shape.
-2. Add the shared SQLite atom store, per-agent sync state, and synthetic
-   fixture CLI/test helper.
-3. Add memory-core sync for `channel_context`.
-4. Add source weighting and authority metadata to search results.
-5. Wire Telegram group/topic messages into the typed channel-memory ingest seam.
-6. Add retention, alias migration, and status visibility.
+1. Add the shared `channel_context` source type, runtime/Zod source lists, tool
+   corpus enum, and retrieval-time source-weight configuration. This should not
+   write atoms or touch Telegram yet.
+2. Add the per-agent SQLite atom store, sync-state table, generated Kysely
+   types, schema version bump, deterministic atom id helper, and synthetic
+   fixture tests.
+3. Add builtin memory-core sync for `channel_context`, including virtual corpus
+   ids and explicit search/memory-get behavior for channel hits.
+4. Add source weighting and authority metadata to search results before the
+   final `minScore` cutoff, with tests proving channel context ranks below
+   curated memory and sessions.
+5. Wire Telegram group/topic messages into the typed channel-memory ingest seam
+   behind `channelMemory` config.
+6. Add retention, alias migration or a clearly deferred alias table, status
+   visibility, and stale-index cleanup.
 7. Promote docs from this plan into user-facing concept and configuration docs.
 
 ## Review questions
