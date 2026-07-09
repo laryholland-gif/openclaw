@@ -31,6 +31,35 @@ export interface CacheEntries {
   value_json: string | null;
 }
 
+export interface MemoryChannelAtomSyncState {
+  atom_id: string;
+  chunk_hash: string;
+  chunk_path: string;
+  index_identity_hash: string;
+  indexed_at: number;
+}
+
+export interface MemoryChannelAtoms {
+  account_id: string | null;
+  alias_of: string | null;
+  authority: string;
+  body: string;
+  conversation_alias: string | null;
+  conversation_id: string;
+  id: string;
+  ingested_at: number;
+  message_id: string;
+  migration_group_id: string | null;
+  provider: string;
+  received_at: number;
+  sender_display_name: string | null;
+  sender_handle: string | null;
+  sender_id: string | null;
+  surface: string;
+  thread_id: string | null;
+  thread_key: string;
+}
+
 export interface MemoryEmbeddingCache {
   dims: number | null;
   embedding: string;
@@ -86,6 +115,8 @@ export interface DB {
   auth_profile_state: AuthProfileState;
   auth_profile_store: AuthProfileStore;
   cache_entries: CacheEntries;
+  memory_channel_atom_sync_state: MemoryChannelAtomSyncState;
+  memory_channel_atoms: MemoryChannelAtoms;
   memory_embedding_cache: MemoryEmbeddingCache;
   memory_index_chunks: MemoryIndexChunks;
   memory_index_meta: MemoryIndexMeta;
