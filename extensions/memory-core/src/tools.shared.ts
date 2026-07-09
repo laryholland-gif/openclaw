@@ -3,9 +3,14 @@ import { optionalFiniteNumberSchema, stringEnum } from "openclaw/plugin-sdk/chan
 import { createLazyRuntimeModule } from "openclaw/plugin-sdk/lazy-runtime";
 import {
   listMemoryCorpusSupplements,
+  MEMORY_SOURCE_CHANNEL_CONTEXT,
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCE_SESSIONS,
+  MEMORY_SOURCES,
   resolveMemorySearchConfig,
   resolveSessionAgentIds,
   type MemoryCorpusSearchResult,
+  type MemorySource,
   type AnyAgentTool,
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
@@ -28,7 +33,7 @@ export const MemorySearchSchema = Type.Object({
   query: Type.String(),
   maxResults: Type.Optional(Type.Integer({ minimum: 1 })),
   minScore: optionalFiniteNumberSchema(),
-  corpus: Type.Optional(stringEnum(["memory", "wiki", "all", "sessions"])),
+  corpus: Type.Optional(stringEnum(["memory", "wiki", "all", ...MEMORY_SOURCES])),
 });
 
 export const MemoryGetSchema = Type.Object({
@@ -155,9 +160,13 @@ export async function searchMemoryCorpusSupplements(params: {
   query: string;
   maxResults?: number;
   agentSessionKey?: string;
-  corpus?: "memory" | "wiki" | "all" | "sessions";
+  corpus?: "memory" | "wiki" | "all" | MemorySource;
 }): Promise<MemoryCorpusSearchResult[]> {
-  if (params.corpus === "memory" || params.corpus === "sessions") {
+  if (
+    params.corpus === MEMORY_SOURCE_MEMORY ||
+    params.corpus === MEMORY_SOURCE_SESSIONS ||
+    params.corpus === MEMORY_SOURCE_CHANNEL_CONTEXT
+  ) {
     return [];
   }
   const supplements = listMemoryCorpusSupplements();
@@ -184,9 +193,13 @@ export async function getMemoryCorpusSupplementResult(params: {
   fromLine?: number;
   lineCount?: number;
   agentSessionKey?: string;
-  corpus?: "memory" | "wiki" | "all" | "sessions";
+  corpus?: "memory" | "wiki" | "all" | MemorySource;
 }) {
-  if (params.corpus === "memory" || params.corpus === "sessions") {
+  if (
+    params.corpus === MEMORY_SOURCE_MEMORY ||
+    params.corpus === MEMORY_SOURCE_SESSIONS ||
+    params.corpus === MEMORY_SOURCE_CHANNEL_CONTEXT
+  ) {
     return null;
   }
   for (const registration of listMemoryCorpusSupplements()) {

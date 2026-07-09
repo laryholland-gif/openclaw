@@ -766,6 +766,21 @@ describe("memory search config", () => {
     expect(resolved?.sources).toEqual(["memory"]);
   });
 
+  it("keeps channel_context sources without session memory enabled", () => {
+    const cfg = asConfig({
+      agents: {
+        defaults: {
+          memorySearch: {
+            provider: "openai",
+            sources: ["memory", "sessions", "channel_context"],
+          },
+        },
+      },
+    });
+    const resolved = resolveMemorySearchConfig(cfg, "main");
+    expect(resolved?.sources).toEqual(["memory", "channel_context"]);
+  });
+
   it("allows session sources when experimental flag is enabled", () => {
     const cfg = asConfig({
       agents: {

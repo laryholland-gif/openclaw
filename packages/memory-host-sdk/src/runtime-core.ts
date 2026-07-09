@@ -1,6 +1,13 @@
 // Focused runtime contract for memory plugin config/state/helpers.
 
 export type { AnyAgentTool } from "./host/openclaw-runtime-agent.js";
+export {
+  MEMORY_SOURCE_CHANNEL_CONTEXT,
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCE_SESSIONS,
+  MEMORY_SOURCES,
+} from "./engine-storage.js";
+export type { MemorySource } from "./engine-storage.js";
 export { resolveCronStyleNow } from "./host/openclaw-runtime-agent.js";
 export { DEFAULT_AGENT_COMPACTION_RESERVE_TOKENS_FLOOR } from "./host/openclaw-runtime-agent.js";
 export { resolveDefaultAgentId, resolveSessionAgentId } from "./host/openclaw-runtime-agent.js";

@@ -42,6 +42,12 @@ export type {
   MemorySyncProgressUpdate,
 } from "./host/types.js";
 export {
+  MEMORY_SOURCE_CHANNEL_CONTEXT,
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCE_SESSIONS,
+  MEMORY_SOURCES,
+} from "./host/types.js";
+export {
   ensureMemoryIndexSchema,
   MEMORY_EMBEDDING_CACHE_TABLE,
   MEMORY_INDEX_CHUNKS_TABLE,

@@ -1,6 +1,9 @@
 // Memory Core plugin module implements tools behavior.
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
-import type { MemorySource } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
+import {
+  MEMORY_SOURCES,
+  type MemorySource,
+} from "openclaw/plugin-sdk/memory-core-host-engine-storage";
 import {
   asToolParamsRecord,
   jsonResult,
@@ -42,6 +45,7 @@ import {
 type MemorySearchToolResult =
   | (MemorySearchResult & { corpus: MemorySource })
   | MemoryCorpusSearchResult;
+type MemorySearchCorpus = "memory" | "wiki" | "all" | MemorySource;
 type MemoryManagerContext = Awaited<ReturnType<typeof getMemoryManagerContextWithPurpose>>;
 type ActiveMemoryManagerContext = Extract<MemoryManagerContext, { manager: unknown }>;
 type QmdRuntimeDebug = NonNullable<MemorySearchRuntimeDebug["qmd"]>;
@@ -405,10 +409,7 @@ export function createMemorySearchTool(options: {
         const maxResults = readPositiveIntegerParam(rawParams, "maxResults");
         const minScore = readFiniteNumberParam(rawParams, "minScore");
         const requestedCorpus = readStringParam(rawParams, "corpus") as
-          | "memory"
-          | "wiki"
-          | "all"
-          | "sessions"
+          | MemorySearchCorpus
           | undefined;
         const cooldownKey = resolveMemorySearchToolCooldownKey({
           agentId,
@@ -520,12 +521,11 @@ export function createMemorySearchTool(options: {
                     cfg,
                     options.agentSessionKey,
                   );
-                  const searchSources: MemorySource[] | undefined =
-                    requestedCorpus === "sessions"
-                      ? (["sessions"] as MemorySource[])
-                      : requestedCorpus === "memory"
-                        ? (["memory"] as MemorySource[])
-                        : undefined;
+                  const searchSources: MemorySource[] | undefined = MEMORY_SOURCES.includes(
+                    requestedCorpus as MemorySource,
+                  )
+                    ? ([requestedCorpus] as MemorySource[])
+                    : undefined;
                   const searchOptions = {
                     maxResults,
                     minScore,
@@ -589,10 +589,10 @@ export function createMemorySearchTool(options: {
                     sandboxed: options.sandboxed === true,
                     hits: rawResults,
                   });
-                  if (requestedCorpus === "sessions") {
-                    rawResults = rawResults.filter((hit) => hit.source === "sessions");
-                  } else if (requestedCorpus === "memory") {
-                    rawResults = rawResults.filter((hit) => hit.source === "memory");
+                  if (requestedCorpus && MEMORY_SOURCES.includes(requestedCorpus as MemorySource)) {
+                    rawResults = rawResults.filter(
+                      (hit) => hit.source === (requestedCorpus as MemorySource),
+                    );
                   }
                   const status = activeMemory.manager.status();
                   const decorated = decorateCitations(rawResults, includeCitations);

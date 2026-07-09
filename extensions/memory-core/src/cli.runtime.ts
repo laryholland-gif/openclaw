@@ -3,14 +3,17 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { MemoryEmbeddingProbeResult } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
+import { isUsageCountedSessionTranscriptFileName } from "openclaw/plugin-sdk/memory-core-host-engine-qmd";
+import type {
+  MemoryEmbeddingProbeResult,
+  MemorySource,
+} from "openclaw/plugin-sdk/memory-core-host-engine-storage";
 import {
   resolveMemoryDreamingConfig,
   resolveMemoryLightDreamingConfig,
   resolveMemoryRemDreamingConfig,
 } from "openclaw/plugin-sdk/memory-core-host-status";
 import { buildAgentSessionKey } from "openclaw/plugin-sdk/routing";
-import { isUsageCountedSessionTranscriptFileName } from "openclaw/plugin-sdk/memory-core-host-engine-qmd";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import {
   colorize,
@@ -72,7 +75,7 @@ import {
 type MemoryManager = NonNullable<Awaited<ReturnType<typeof getMemorySearchManager>>["manager"]>;
 type MemoryManagerPurpose = Parameters<typeof getMemorySearchManager>[0]["purpose"];
 
-type MemorySourceName = "memory" | "sessions";
+type MemorySourceName = MemorySource;
 
 function formatMemoryIndexIdentityWarning(
   status: ReturnType<MemoryManager["status"]>,
@@ -685,6 +688,13 @@ async function scanMemorySources(params: {
     }
     if (source === "sessions") {
       scans.push(await scanSessionFiles(params.agentId));
+    }
+    if (source === "channel_context") {
+      scans.push({
+        source,
+        totalFiles: null,
+        issues: ["channel_context atom storage scanning is not implemented yet"],
+      });
     }
   }
   const issues = scans.flatMap((scan) => scan.issues);

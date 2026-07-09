@@ -8,6 +8,7 @@
 import { resolveTimerTimeoutMs } from "@openclaw/normalization-core/number-coercion";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
+import type { MemorySource } from "../memory-host-sdk/engine-storage.js";
 import { getActiveMemorySearchManager } from "../plugins/memory-runtime.js";
 import { withTimeout } from "../utils/with-timeout.js";
 import type { RealtimeVoiceAgentConsultResult } from "./agent-consult-runtime.js";
@@ -22,7 +23,7 @@ type MemorySearchHit = {
   startLine: number;
   endLine: number;
   snippet: string;
-  source: "memory" | "sessions";
+  source: MemorySource;
   score: number;
 };
 

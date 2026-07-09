@@ -833,7 +833,7 @@ const AgentToolsSchema = z
 export const MemorySearchSchema = z
   .object({
     enabled: z.boolean().optional(),
-    sources: z.array(z.union([z.literal("memory"), z.literal("sessions")])).optional(),
+    sources: z.array(z.enum(["memory", "sessions", "channel_context"])).optional(),
     extraPaths: z.array(z.string()).optional(),
     qmd: z
       .object({

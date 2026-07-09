@@ -2,6 +2,7 @@ import { createLazyRuntimeModule } from "openclaw/plugin-sdk/lazy-runtime";
 // Memory Core plugin entrypoint registers its OpenClaw integration.
 import {
   jsonResult,
+  MEMORY_SOURCES,
   resolveMemorySearchConfig,
   resolveSessionAgentIds,
   type MemoryPluginRuntime,
@@ -60,7 +61,7 @@ const MemorySearchSchema = {
     query: { type: "string" },
     maxResults: { type: "integer", minimum: 1 },
     minScore: { type: "number" },
-    corpus: { type: "string", enum: ["memory", "wiki", "all", "sessions"] },
+    corpus: { type: "string", enum: ["memory", "wiki", "all", ...MEMORY_SOURCES] },
   },
   required: ["query"],
   additionalProperties: false,

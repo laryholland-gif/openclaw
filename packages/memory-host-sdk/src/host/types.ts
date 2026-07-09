@@ -1,6 +1,16 @@
 // Public memory host contracts shared by runtime, QMD, builtin search, and
 // package consumers.
-export type MemorySource = "memory" | "sessions";
+export const MEMORY_SOURCE_MEMORY = "memory" as const;
+export const MEMORY_SOURCE_SESSIONS = "sessions" as const;
+export const MEMORY_SOURCE_CHANNEL_CONTEXT = "channel_context" as const;
+
+export const MEMORY_SOURCES = [
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCE_SESSIONS,
+  MEMORY_SOURCE_CHANNEL_CONTEXT,
+] as const;
+
+export type MemorySource = (typeof MEMORY_SOURCES)[number];
 
 /** One ranked memory search hit with optional vector/text scoring details. */
 export type MemorySearchResult = {
