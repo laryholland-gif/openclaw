@@ -8,12 +8,14 @@ import type {
   MemoryEmbeddingProbeResult,
   MemorySource,
 } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
+import { requireNodeSqlite } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
 import {
   resolveMemoryDreamingConfig,
   resolveMemoryLightDreamingConfig,
   resolveMemoryRemDreamingConfig,
 } from "openclaw/plugin-sdk/memory-core-host-status";
 import { buildAgentSessionKey } from "openclaw/plugin-sdk/routing";
+import { resolveOpenClawAgentSqlitePath } from "openclaw/plugin-sdk/sqlite-runtime";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import {
   colorize,
@@ -558,6 +560,42 @@ async function scanSessionFiles(agentId: string): Promise<SourceScan> {
   }
 }
 
+async function scanChannelContextAtoms(agentId: string): Promise<SourceScan> {
+  const dbPath = resolveOpenClawAgentSqlitePath({ agentId });
+  try {
+    await fs.access(dbPath, fsSync.constants.R_OK);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return { source: "channel_context", totalFiles: 0, issues: [] };
+    }
+    return {
+      source: "channel_context",
+      totalFiles: null,
+      issues: [`agent database not accessible (${shortenHomePath(dbPath)})`],
+    };
+  }
+
+  const { DatabaseSync } = requireNodeSqlite();
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const table = db
+      .prepare(
+        "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'memory_channel_atoms'",
+      )
+      .get() as { ok?: unknown } | undefined;
+    if (table?.ok !== 1) {
+      return { source: "channel_context", totalFiles: 0, issues: [] };
+    }
+    const row = db.prepare("SELECT COUNT(*) AS count FROM memory_channel_atoms").get() as
+      | { count?: unknown }
+      | undefined;
+    const count = typeof row?.count === "number" && Number.isSafeInteger(row.count) ? row.count : 0;
+    return { source: "channel_context", totalFiles: count, issues: [] };
+  } finally {
+    db.close();
+  }
+}
+
 async function scanMemoryFiles(
   workspaceDir: string,
   extraPaths: string[] = [],
@@ -690,11 +728,7 @@ async function scanMemorySources(params: {
       scans.push(await scanSessionFiles(params.agentId));
     }
     if (source === "channel_context") {
-      scans.push({
-        source,
-        totalFiles: null,
-        issues: ["channel_context atom storage scanning is not implemented yet"],
-      });
+      scans.push(await scanChannelContextAtoms(params.agentId));
     }
   }
   const issues = scans.flatMap((scan) => scan.issues);

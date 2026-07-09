@@ -30,6 +30,7 @@ import {
 import {
   buildFileEntry,
   ensureMemoryIndexSchema,
+  hashText,
   isFileMissingError,
   listMemoryFiles,
   loadSqliteVecExtension,
@@ -46,6 +47,7 @@ import {
 } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
 import { resolveTimerTimeoutMs } from "openclaw/plugin-sdk/number-runtime";
 import { normalizeAgentId } from "openclaw/plugin-sdk/routing";
+import { ensureOpenClawAgentDatabaseSchema } from "openclaw/plugin-sdk/sqlite-runtime";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
 import {
   createEmbeddingProvider,
@@ -161,6 +163,7 @@ const SESSION_SYNC_YIELD_EVERY = 10;
 const SOURCE_WIDE_SESSION_INDEX_FLUSH_FILES = 128;
 const VECTOR_LOAD_TIMEOUT_MS = 30_000;
 const MEMORY_WATCH_PRESSURE_STARTUP_CHECK_DELAY_MS = 10_000;
+const CHANNEL_CONTEXT_SOURCE = "channel_context" satisfies MemorySource;
 const IGNORED_MEMORY_WATCH_DIR_NAMES = new Set([
   ".git",
   "node_modules",
@@ -192,6 +195,27 @@ type MemorySessionTranscriptUpdate = {
 type MemoryTranscriptUpdateSubscriber = (
   listener: (update: MemorySessionTranscriptUpdate) => void,
 ) => () => void;
+
+type ChannelAtomRow = {
+  id: string;
+  provider: string;
+  surface: string;
+  account_id: string | null;
+  conversation_id: string;
+  conversation_alias: string | null;
+  thread_id: string | null;
+  thread_key: string;
+  message_id: string;
+  sender_id: string | null;
+  sender_handle: string | null;
+  sender_display_name: string | null;
+  body: string;
+  received_at: number;
+  ingested_at: number;
+  authority: string;
+  migration_group_id: string | null;
+  alias_of: string | null;
+};
 
 function memoryTableExists(db: DatabaseSync, tableName: string): boolean {
   return Boolean(
@@ -289,6 +313,199 @@ function createSessionSyncYield(total: number): () => Promise<void> {
       });
     }
   };
+}
+
+function sanitizeChannelContextPathSegment(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "_";
+  }
+  return trimmed.replace(/[^A-Za-z0-9._=-]+/gu, "_").replace(/^_+|_+$/gu, "") || "_";
+}
+
+function formatChannelAtomTimestamp(ms: number): string {
+  if (!Number.isFinite(ms)) {
+    return "";
+  }
+  try {
+    return new Date(ms).toISOString();
+  } catch {
+    return "";
+  }
+}
+
+function formatChannelAtomSender(atom: ChannelAtomRow): string {
+  const parts = [atom.sender_display_name, atom.sender_handle, atom.sender_id]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+  return parts.length > 0 ? parts.join(" / ") : "unknown";
+}
+
+function buildChannelAtomVirtualPath(atom: ChannelAtomRow): string {
+  const suffix = hashText(atom.id).slice(0, 12);
+  return [
+    "channel_context",
+    sanitizeChannelContextPathSegment(atom.provider),
+    sanitizeChannelContextPathSegment(atom.conversation_id),
+    sanitizeChannelContextPathSegment(atom.thread_key),
+    `${sanitizeChannelContextPathSegment(atom.message_id)}-${suffix}.md`,
+  ].join("/");
+}
+
+function buildChannelAtomVirtualContent(atom: ChannelAtomRow): string {
+  const lines = [
+    "# Channel Context Atom",
+    `Provider: ${atom.provider}`,
+    `Surface: ${atom.surface}`,
+    `Conversation: ${atom.conversation_alias ?? atom.conversation_id}`,
+    `Conversation ID: ${atom.conversation_id}`,
+    `Thread: ${atom.thread_id ?? "none"}`,
+    `Message ID: ${atom.message_id}`,
+    `Sender: ${formatChannelAtomSender(atom)}`,
+    `Received: ${formatChannelAtomTimestamp(atom.received_at)}`,
+    `Authority: ${atom.authority}`,
+  ];
+  if (atom.migration_group_id) {
+    lines.push(`Migration Group: ${atom.migration_group_id}`);
+  }
+  if (atom.alias_of) {
+    lines.push(`Alias Of: ${atom.alias_of}`);
+  }
+  lines.push("", atom.body);
+  return `${lines.join("\n")}\n`;
+}
+
+function buildChannelAtomIndexHash(atom: ChannelAtomRow, content: string): string {
+  return hashText(
+    JSON.stringify({
+      id: atom.id,
+      provider: atom.provider,
+      surface: atom.surface,
+      accountId: atom.account_id,
+      conversationId: atom.conversation_id,
+      conversationAlias: atom.conversation_alias,
+      threadId: atom.thread_id,
+      threadKey: atom.thread_key,
+      messageId: atom.message_id,
+      senderId: atom.sender_id,
+      senderHandle: atom.sender_handle,
+      senderDisplayName: atom.sender_display_name,
+      receivedAt: atom.received_at,
+      authority: atom.authority,
+      migrationGroupId: atom.migration_group_id,
+      aliasOf: atom.alias_of,
+      content,
+    }),
+  );
+}
+
+function listChannelAtomRows(db: DatabaseSync): ChannelAtomRow[] {
+  if (!memoryTableExists(db, "memory_channel_atoms")) {
+    return [];
+  }
+  return db
+    .prepare(
+      `SELECT
+        id,
+        provider,
+        surface,
+        account_id,
+        conversation_id,
+        conversation_alias,
+        thread_id,
+        thread_key,
+        message_id,
+        sender_id,
+        sender_handle,
+        sender_display_name,
+        body,
+        received_at,
+        ingested_at,
+        authority,
+        migration_group_id,
+        alias_of
+       FROM memory_channel_atoms
+       ORDER BY received_at ASC, id ASC`,
+    )
+    .all() as ChannelAtomRow[];
+}
+
+function copyChannelAtomRows(params: { sourceDb: DatabaseSync; targetDb: DatabaseSync }): void {
+  const rows = listChannelAtomRows(params.sourceDb);
+  if (rows.length === 0) {
+    return;
+  }
+  const insert = params.targetDb.prepare(
+    `INSERT INTO memory_channel_atoms (
+      id,
+      provider,
+      surface,
+      account_id,
+      conversation_id,
+      conversation_alias,
+      thread_id,
+      thread_key,
+      message_id,
+      sender_id,
+      sender_handle,
+      sender_display_name,
+      body,
+      received_at,
+      ingested_at,
+      authority,
+      migration_group_id,
+      alias_of
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      provider=excluded.provider,
+      surface=excluded.surface,
+      account_id=excluded.account_id,
+      conversation_id=excluded.conversation_id,
+      conversation_alias=excluded.conversation_alias,
+      thread_id=excluded.thread_id,
+      thread_key=excluded.thread_key,
+      message_id=excluded.message_id,
+      sender_id=excluded.sender_id,
+      sender_handle=excluded.sender_handle,
+      sender_display_name=excluded.sender_display_name,
+      body=excluded.body,
+      received_at=excluded.received_at,
+      ingested_at=excluded.ingested_at,
+      authority=excluded.authority,
+      migration_group_id=excluded.migration_group_id,
+      alias_of=excluded.alias_of`,
+  );
+  params.targetDb.exec("BEGIN");
+  try {
+    for (const row of rows) {
+      insert.run(
+        row.id,
+        row.provider,
+        row.surface,
+        row.account_id,
+        row.conversation_id,
+        row.conversation_alias,
+        row.thread_id,
+        row.thread_key,
+        row.message_id,
+        row.sender_id,
+        row.sender_handle,
+        row.sender_display_name,
+        row.body,
+        row.received_at,
+        row.ingested_at,
+        row.authority,
+        row.migration_group_id,
+        row.alias_of,
+      );
+    }
+    params.targetDb.exec("COMMIT");
+  } catch (err) {
+    try {
+      params.targetDb.exec("ROLLBACK");
+    } catch {}
+    throw err;
+  }
 }
 
 export abstract class MemoryManagerSyncOps {
@@ -491,6 +708,7 @@ export abstract class MemoryManagerSyncOps {
 
   private async executeSourceWideSync(params: {
     shouldSyncMemory: boolean;
+    shouldSyncChannelAtoms: boolean;
     shouldSyncSessions: boolean;
     needsFullReindex: boolean;
     needsFullSessionReindex?: boolean;
@@ -504,18 +722,26 @@ export abstract class MemoryManagerSyncOps {
           deferIndex: true,
         })
       : this.emptySourceSyncPlan();
+    const channelPlan = params.shouldSyncChannelAtoms
+      ? await this.syncChannelAtomFiles({
+          needsFullReindex: params.needsFullReindex,
+          progress: params.progress,
+          deferIndex: true,
+        })
+      : this.emptySourceSyncPlan();
     if (params.shouldSyncSessions) {
       await this.syncSessionFiles({
         needsFullReindex: params.needsFullSessionReindex ?? params.needsFullReindex,
         targetSessionFiles: params.targetSessionFiles,
         progress: params.progress,
         deferIndex: true,
-        prefixIndexItems: memoryPlan.indexItems,
+        prefixIndexItems: [...memoryPlan.indexItems, ...channelPlan.indexItems],
       });
       await memoryPlan.finalize();
+      await channelPlan.finalize();
       return;
     }
-    await this.executeSourceSyncPlans([memoryPlan], params.progress);
+    await this.executeSourceSyncPlans([memoryPlan, channelPlan], params.progress);
   }
 
   protected hasIndexedChunks(): boolean {
@@ -2089,6 +2315,159 @@ export abstract class MemoryManagerSyncOps {
     return this.emptySourceSyncPlan();
   }
 
+  private buildChannelAtomIndexIdentityHash(): string {
+    return hashText(
+      JSON.stringify({
+        providerKey: this.providerKey ?? "unknown",
+        model: this.provider?.model ?? "fts-only",
+        source: CHANNEL_CONTEXT_SOURCE,
+        chunkTokens: this.settings.chunking.tokens,
+        chunkOverlap: this.settings.chunking.overlap,
+        ftsTokenizer: this.settings.store.fts.tokenizer,
+      }),
+    );
+  }
+
+  private buildChannelAtomIndexEntry(atom: ChannelAtomRow): {
+    atom: ChannelAtomRow;
+    entry: MemoryIndexEntry;
+    path: string;
+  } {
+    const content = buildChannelAtomVirtualContent(atom);
+    const hash = buildChannelAtomIndexHash(atom, content);
+    const pathname = buildChannelAtomVirtualPath(atom);
+    return {
+      atom,
+      path: pathname,
+      entry: {
+        path: pathname,
+        absPath: pathname,
+        mtimeMs: Math.max(atom.received_at, atom.ingested_at),
+        size: Buffer.byteLength(content),
+        hash,
+        kind: "markdown",
+        content,
+      },
+    };
+  }
+
+  private deleteIndexedPathBySource(params: { path: string; source: MemorySource }): void {
+    if (this.vector.enabled && this.vector.available) {
+      try {
+        this.db
+          .prepare(
+            `DELETE FROM ${VECTOR_TABLE} WHERE id IN (SELECT id FROM memory_index_chunks WHERE path = ? AND source = ?)`,
+          )
+          .run(params.path, params.source);
+      } catch {}
+    }
+    try {
+      this.db
+        .prepare(`DELETE FROM ${FTS_TABLE} WHERE path = ? AND source = ?`)
+        .run(params.path, params.source);
+    } catch {}
+    this.db
+      .prepare(`DELETE FROM memory_index_chunks WHERE path = ? AND source = ?`)
+      .run(params.path, params.source);
+    this.db
+      .prepare(`DELETE FROM memory_index_sources WHERE path = ? AND source = ?`)
+      .run(params.path, params.source);
+  }
+
+  private markChannelAtomIndexed(params: {
+    atomId: string;
+    indexIdentityHash: string;
+    chunkPath: string;
+    chunkHash: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO memory_channel_atom_sync_state (
+          atom_id,
+          index_identity_hash,
+          indexed_at,
+          chunk_path,
+          chunk_hash
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(atom_id, index_identity_hash) DO UPDATE SET
+          indexed_at=excluded.indexed_at,
+          chunk_path=excluded.chunk_path,
+          chunk_hash=excluded.chunk_hash`,
+      )
+      .run(params.atomId, params.indexIdentityHash, Date.now(), params.chunkPath, params.chunkHash);
+  }
+
+  private async syncChannelAtomFiles(params: {
+    needsFullReindex: boolean;
+    progress?: MemorySyncProgressState;
+    deferIndex?: boolean;
+  }): Promise<MemorySourceSyncPlan> {
+    const atoms = listChannelAtomRows(this.db);
+    const entries = atoms.map((atom) => this.buildChannelAtomIndexEntry(atom));
+    const existingState = loadMemorySourceFileState({
+      db: this.db,
+      source: CHANNEL_CONTEXT_SOURCE,
+    });
+    const activePaths = new Set(entries.map((item) => item.path));
+    const indexIdentityHash = this.buildChannelAtomIndexIdentityHash();
+    if (params.progress) {
+      params.progress.total += entries.length;
+      params.progress.report({
+        completed: params.progress.completed,
+        total: params.progress.total,
+        label: this.batch.enabled
+          ? "Indexing channel context atoms (batch)..."
+          : "Indexing channel context atoms…",
+      });
+    }
+
+    const deleteStaleRows = async () => {
+      for (const stale of existingState.rows) {
+        if (activePaths.has(stale.path)) {
+          continue;
+        }
+        this.deleteIndexedPathBySource({ path: stale.path, source: CHANNEL_CONTEXT_SOURCE });
+        this.db
+          .prepare(`DELETE FROM memory_channel_atom_sync_state WHERE chunk_path = ?`)
+          .run(stale.path);
+      }
+    };
+
+    const dirtyItems: MemoryIndexWorkItem[] = [];
+    for (const item of entries) {
+      const existingHash = existingState.hashes.get(item.path);
+      if (!params.needsFullReindex && existingHash === item.entry.hash) {
+        if (params.progress) {
+          params.progress.completed += 1;
+          params.progress.report({
+            completed: params.progress.completed,
+            total: params.progress.total,
+          });
+        }
+        continue;
+      }
+      dirtyItems.push({
+        entry: item.entry,
+        source: CHANNEL_CONTEXT_SOURCE,
+        afterIndex: () => {
+          this.markChannelAtomIndexed({
+            atomId: item.atom.id,
+            indexIdentityHash,
+            chunkPath: item.path,
+            chunkHash: item.entry.hash,
+          });
+        },
+      });
+    }
+
+    if (params.deferIndex) {
+      return { indexItems: dirtyItems, finalize: deleteStaleRows };
+    }
+    await this.indexQueuedFiles(dirtyItems, params.progress);
+    await deleteStaleRows();
+    return this.emptySourceSyncPlan();
+  }
+
   private async syncSessionFiles(params: {
     needsFullReindex: boolean;
     targetSessionFiles?: string[];
@@ -2529,11 +2908,16 @@ export abstract class MemoryManagerSyncOps {
       const shouldSyncMemory =
         this.sources.has("memory") &&
         ((!hasTargetSessionFiles && params?.force) || needsFullReindex || this.dirty);
+      const shouldSyncChannelAtoms =
+        this.sources.has(CHANNEL_CONTEXT_SOURCE) &&
+        !hasTargetSessionFiles &&
+        (Boolean(params?.force) || needsFullReindex || this.dirty);
       const shouldSyncSessions = this.shouldSyncSessions(params, needsFullReindex);
 
       if (this.shouldDeferSourceWideBatch()) {
         await this.executeSourceWideSync({
           shouldSyncMemory,
+          shouldSyncChannelAtoms,
           shouldSyncSessions,
           needsFullReindex,
           needsFullSessionReindex,
@@ -2542,6 +2926,9 @@ export abstract class MemoryManagerSyncOps {
         });
         if (shouldSyncMemory) {
           this.clearMemoryRetryState();
+        }
+        if (shouldSyncChannelAtoms && !shouldSyncMemory) {
+          this.dirty = false;
         }
         if (shouldSyncSessions) {
           this.clearSessionRetryState();
@@ -2552,6 +2939,16 @@ export abstract class MemoryManagerSyncOps {
         if (shouldSyncMemory) {
           await this.syncMemoryFiles({ needsFullReindex, progress: progress ?? undefined });
           this.clearMemoryRetryState();
+        }
+
+        if (shouldSyncChannelAtoms) {
+          await this.syncChannelAtomFiles({
+            needsFullReindex,
+            progress: progress ?? undefined,
+          });
+          if (!shouldSyncMemory) {
+            this.dirty = false;
+          }
         }
 
         if (shouldSyncSessions) {
@@ -2681,6 +3078,7 @@ export abstract class MemoryManagerSyncOps {
     let tempDbClosed = false;
     const originalRetryState = this.snapshotReindexRetryState();
     const shouldRetryMemoryOnFailure = this.sources.has("memory");
+    const shouldRetryChannelAtomsOnFailure = this.sources.has(CHANNEL_CONTEXT_SOURCE);
     const shouldRetrySessionsOnFailure = this.shouldSyncSessions(
       { reason: params.reason, force: params.force },
       true,
@@ -2716,21 +3114,32 @@ export abstract class MemoryManagerSyncOps {
       this.resetVectorState();
       this.fts.available = false;
       this.fts.loadError = undefined;
+      ensureOpenClawAgentDatabaseSchema(tempDb, {
+        agentId: this.agentId,
+        path: tempDbPath,
+        register: false,
+      });
       this.ensureSchema();
+      copyChannelAtomRows({ sourceDb: originalDb, targetDb: tempDb });
       await this.seedEmbeddingCache(originalDb);
 
       const shouldSyncMemory = shouldRetryMemoryOnFailure;
+      const shouldSyncChannelAtoms = shouldRetryChannelAtomsOnFailure;
       const shouldSyncSessions = shouldRetrySessionsOnFailure;
 
       if (this.shouldDeferSourceWideBatch()) {
         await this.executeSourceWideSync({
           shouldSyncMemory,
+          shouldSyncChannelAtoms,
           shouldSyncSessions,
           needsFullReindex: true,
           progress: params.progress,
         });
         if (shouldSyncMemory) {
           this.clearMemoryRetryState();
+        }
+        if (shouldSyncChannelAtoms && !shouldSyncMemory) {
+          this.dirty = false;
         }
         if (shouldSyncSessions) {
           this.clearSessionRetryState();
@@ -2741,6 +3150,13 @@ export abstract class MemoryManagerSyncOps {
         if (shouldSyncMemory) {
           await this.syncMemoryFiles({ needsFullReindex: true, progress: params.progress });
           this.clearMemoryRetryState();
+        }
+
+        if (shouldSyncChannelAtoms) {
+          await this.syncChannelAtomFiles({ needsFullReindex: true, progress: params.progress });
+          if (!shouldSyncMemory) {
+            this.dirty = false;
+          }
         }
 
         if (shouldSyncSessions) {
@@ -2808,7 +3224,7 @@ export abstract class MemoryManagerSyncOps {
       restoreOriginalState();
       this.restoreReindexRetryState(originalRetryState);
       this.markFailedFullReindexRetry({
-        memory: shouldRetryMemoryOnFailure,
+        memory: shouldRetryMemoryOnFailure || shouldRetryChannelAtomsOnFailure,
         sessions: shouldRetrySessionsOnFailure,
       });
       throw err;

@@ -172,6 +172,21 @@ export async function publishMemoryDatabaseTables(params: {
         FROM ${MEMORY_REINDEX_SCHEMA}.memory_index_chunks;
       `);
 
+      if (tableExists(params.targetDb, MEMORY_REINDEX_SCHEMA, "memory_channel_atom_sync_state")) {
+        params.targetDb.exec(`
+          DELETE FROM main.memory_channel_atom_sync_state;
+          INSERT INTO main.memory_channel_atom_sync_state (
+            atom_id, index_identity_hash, indexed_at, chunk_path, chunk_hash
+          )
+          SELECT atom_id, index_identity_hash, indexed_at, chunk_path, chunk_hash
+          FROM ${MEMORY_REINDEX_SCHEMA}.memory_channel_atom_sync_state
+          WHERE EXISTS (
+            SELECT 1 FROM main.memory_channel_atoms
+            WHERE main.memory_channel_atoms.id = ${MEMORY_REINDEX_SCHEMA}.memory_channel_atom_sync_state.atom_id
+          );
+        `);
+      }
+
       if (tableExists(params.targetDb, MEMORY_REINDEX_SCHEMA, "memory_embedding_cache")) {
         params.targetDb.exec(`
           DELETE FROM main.memory_embedding_cache;
