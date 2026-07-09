@@ -106,6 +106,17 @@ describe("channel atom store", () => {
     expect(rows[0]?.body).toBe("updated body");
   });
 
+  it("is idempotent when account id is absent", () => {
+    const input = createAtomInput({ accountId: null });
+    upsertChannelAtom(database, input);
+    upsertChannelAtom(database, { ...input, body: "updated no-account body" });
+
+    const rows = listChannelAtomsByConversation(database, "telegram", "chat-1");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.account_id).toBeNull();
+    expect(rows[0]?.body).toBe("updated no-account body");
+  });
+
   it("lists atoms for a conversation newest first", () => {
     upsertChannelAtom(database, createAtomInput({ messageId: "msg-a", receivedAt: 2_000 }));
     upsertChannelAtom(database, createAtomInput({ messageId: "msg-b", receivedAt: 3_000 }));

@@ -113,23 +113,25 @@ export function upsertChannelAtom(
       .insertInto("memory_channel_atoms")
       .values(row)
       .onConflict((conflict) =>
-        conflict
-          .columns(["provider", "account_id", "conversation_id", "thread_key", "message_id"])
-          .doUpdateSet({
-            surface: row.surface,
-            conversation_alias: row.conversation_alias,
-            thread_id: row.thread_id,
-            sender_id: row.sender_id,
-            sender_handle: row.sender_handle,
-            sender_display_name: row.sender_display_name,
-            body: row.body,
-            received_at: row.received_at,
-            ingested_at: row.ingested_at,
-            authority: row.authority,
-            migration_group_id: row.migration_group_id,
-            alias_of: row.alias_of,
-            // Do not overwrite id, provider, conversation_id, thread_key, message_id.
-          }),
+        conflict.column("id").doUpdateSet({
+          surface: row.surface,
+          account_id: row.account_id,
+          conversation_id: row.conversation_id,
+          conversation_alias: row.conversation_alias,
+          thread_id: row.thread_id,
+          thread_key: row.thread_key,
+          message_id: row.message_id,
+          sender_id: row.sender_id,
+          sender_handle: row.sender_handle,
+          sender_display_name: row.sender_display_name,
+          body: row.body,
+          received_at: row.received_at,
+          ingested_at: row.ingested_at,
+          authority: row.authority,
+          migration_group_id: row.migration_group_id,
+          alias_of: row.alias_of,
+          // Do not overwrite id or provider.
+        }),
       ),
   );
   return row.id;
