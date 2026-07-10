@@ -728,7 +728,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         temporalDecay: hybrid.temporalDecay,
         workspaceDir: this.workspaceDir,
       });
-      const sorted = decayed.toSorted((a, b) => b.score - a.score);
+      const sorted = this.applySourceWeights(decayed).toSorted((a, b) => b.score - a.score);
       return this.selectScoredResults(sorted, maxResults, minScore, 0);
     }
 
@@ -777,7 +777,12 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         queryVec = await this.embedQueryWithRetry(cleaned, opts?.signal);
       } else if (!this.provider && this.fts.enabled && this.fts.available) {
         log.warn(`memory search: embeddings unavailable; using keyword-only results: ${message}`);
-        return this.selectScoredResults(keywordResults, maxResults, minScore, 0);
+        return this.selectScoredResults(
+          this.applySourceWeights(keywordResults),
+          maxResults,
+          minScore,
+          0,
+        );
       } else {
         throw err;
       }
@@ -791,7 +796,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       : [];
 
     if (!hybrid.enabled || !this.fts.enabled || !this.fts.available) {
-      return vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      return this.applySourceWeights(vectorResults)
+        .filter((entry) => entry.score >= minScore)
+        .slice(0, maxResults);
     }
 
     const merged = await this.mergeHybridResults({
@@ -802,7 +809,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       mmr: hybrid.mmr,
       temporalDecay: hybrid.temporalDecay,
     });
-    const strict = merged.filter((entry) => entry.score >= minScore);
+    const weighted = this.applySourceWeights(merged);
+    const strict = weighted.filter((entry) => entry.score >= minScore);
     if (strict.length > 0 || keywordResults.length === 0) {
       return strict.slice(0, maxResults);
     }
@@ -817,13 +825,25 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       ),
     );
     return this.selectScoredResults(
-      merged.filter((entry) =>
+      weighted.filter((entry) =>
         keywordKeys.has(`${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`),
       ),
       maxResults,
       minScore,
       relaxedMinScore,
     );
+  }
+
+  private applySourceWeights<T extends MemorySearchResult & { score: number }>(results: T[]): T[] {
+    return results
+      .map((entry) => {
+        const weight = this.settings.query.sourceWeights[entry.source] ?? 1;
+        return {
+          ...entry,
+          score: entry.score * weight,
+        };
+      })
+      .toSorted((a, b) => b.score - a.score);
   }
 
   private selectScoredResults<T extends MemorySearchResult & { score: number }>(

@@ -559,6 +559,8 @@ export type MemorySearchConfig = {
   query?: {
     maxResults?: number;
     minScore?: number;
+    /** Per-source ranking multipliers applied before minScore filtering. Defaults: memory=1, sessions=0.9, channel_context=0.8. */
+    sourceWeights?: Partial<Record<MemorySource, number>>;
     hybrid?: {
       /** Enable hybrid BM25 + vector search (default: true). */
       enabled?: boolean;

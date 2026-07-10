@@ -96,6 +96,7 @@ export type ResolvedMemorySearchConfig = {
   query: {
     maxResults: number;
     minScore: number;
+    sourceWeights: Record<MemorySource, number>;
     hybrid: {
       enabled: boolean;
       vectorWeight: number;
@@ -136,6 +137,11 @@ const DEFAULT_TEMPORAL_DECAY_ENABLED = false;
 const DEFAULT_TEMPORAL_DECAY_HALF_LIFE_DAYS = 30;
 const DEFAULT_CACHE_ENABLED = true;
 const DEFAULT_SOURCES: MemorySource[] = [MEMORY_SOURCE_MEMORY];
+const DEFAULT_SOURCE_WEIGHTS: Record<MemorySource, number> = {
+  [MEMORY_SOURCE_MEMORY]: 1,
+  [MEMORY_SOURCE_SESSIONS]: 0.9,
+  [MEMORY_SOURCE_CHANNEL_CONTEXT]: 0.8,
+};
 const DEFAULT_MEMORY_EMBEDDING_PROVIDER = "openai";
 const DEFAULT_REMOTE_BATCH_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_REMOTE_BATCH_TIMEOUT_MINUTES = 60;
@@ -188,6 +194,28 @@ function normalizeSources(
     normalized.add(MEMORY_SOURCE_MEMORY);
   }
   return Array.from(normalized);
+}
+
+function normalizeSourceWeights(
+  defaults: MemorySearchConfig | undefined,
+  overrides: MemorySearchConfig | undefined,
+): Record<MemorySource, number> {
+  const weights: Record<MemorySource, number> = { ...DEFAULT_SOURCE_WEIGHTS };
+  const merge = (sourceWeights?: Partial<Record<MemorySource, number>>) => {
+    for (const source of [
+      MEMORY_SOURCE_MEMORY,
+      MEMORY_SOURCE_SESSIONS,
+      MEMORY_SOURCE_CHANNEL_CONTEXT,
+    ] as const) {
+      const value = sourceWeights?.[source];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        weights[source] = clampNumber(value, 0, 1);
+      }
+    }
+  };
+  merge(defaults?.query?.sourceWeights);
+  merge(overrides?.query?.sourceWeights);
+  return weights;
 }
 
 function getConfiguredMemoryEmbeddingProvider(
@@ -323,6 +351,7 @@ function mergeConfig(
   const query = {
     maxResults: overrides?.query?.maxResults ?? defaults?.query?.maxResults ?? DEFAULT_MAX_RESULTS,
     minScore: overrides?.query?.minScore ?? defaults?.query?.minScore ?? DEFAULT_MIN_SCORE,
+    sourceWeights: normalizeSourceWeights(defaults, overrides),
   };
   const hybrid = {
     enabled:

@@ -1277,6 +1277,14 @@ export const FIELD_HELP: Record<string, string> = {
     "Maximum number of memory hits returned from search before downstream reranking and prompt injection. Raise for broader recall, or lower for tighter prompts and faster responses.",
   "agents.defaults.memorySearch.query.minScore":
     "Minimum relevance score threshold for including memory results in final recall output. Increase to reduce weak/noisy matches, or lower when you need more permissive retrieval.",
+  "agents.defaults.memorySearch.query.sourceWeights":
+    "Per-source ranking multipliers applied before minScore filtering. Keep curated memory at full weight and reduce high-volume sources such as channel_context so they do not overpower durable memory.",
+  "agents.defaults.memorySearch.query.sourceWeights.memory":
+    "Ranking multiplier for curated MEMORY.md and memory/*.md hits. Default: 1.",
+  "agents.defaults.memorySearch.query.sourceWeights.sessions":
+    "Ranking multiplier for indexed session transcript hits. Default: 0.9.",
+  "agents.defaults.memorySearch.query.sourceWeights.channel_context":
+    "Ranking multiplier for channel context atom hits. Default: 0.8.",
   "agents.defaults.memorySearch.query.hybrid.enabled":
     "Combines BM25 keyword matching with vector similarity for better recall on mixed exact + semantic queries. Keep enabled unless you are isolating ranking behavior for troubleshooting.",
   "agents.defaults.memorySearch.query.hybrid.vectorWeight":

@@ -950,6 +950,14 @@ export const MemorySearchSchema = z
       .object({
         maxResults: z.number().int().positive().optional(),
         minScore: z.number().min(0).max(1).optional(),
+        sourceWeights: z
+          .object({
+            memory: z.number().min(0).max(1).optional(),
+            sessions: z.number().min(0).max(1).optional(),
+            channel_context: z.number().min(0).max(1).optional(),
+          })
+          .strict()
+          .optional(),
         hybrid: z
           .object({
             enabled: z.boolean().optional(),
