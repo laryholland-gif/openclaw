@@ -54,6 +54,30 @@ describe("telegram custom commands schema", () => {
     }
   });
 
+  it("accepts channelMemory opt-in config", () => {
+    const res = TelegramConfigSchema.safeParse({
+      channelMemory: { enabled: true, allow: ["123", "-1001234567890:topic:99"] },
+      groups: {
+        "-1001234567890": {
+          channelMemory: { enabled: true, allow: ["-1001234567890"] },
+          topics: {
+            "99": { channelMemory: { enabled: false } },
+          },
+        },
+      },
+      direct: {
+        "123": { channelMemory: { enabled: true, allow: ["telegram:123"] } },
+      },
+      accounts: { ops: { channelMemory: { enabled: false } } },
+    });
+
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.channelMemory?.enabled).toBe(true);
+      expect(res.data.accounts?.ops?.channelMemory?.enabled).toBe(false);
+    }
+  });
+
   it("rejects retired group history context mode keys", () => {
     const res = TelegramConfigSchema.safeParse({ includeGroupHistoryContext: "mention-only" });
 

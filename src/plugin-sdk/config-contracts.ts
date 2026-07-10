@@ -44,6 +44,7 @@ export type {
   SlackSlashCommandConfig,
   TelegramAccountConfig,
   TelegramActionConfig,
+  TelegramChannelMemoryConfig,
   TelegramDirectConfig,
   TelegramDmThreadReplies,
   TelegramExecApprovalConfig,

@@ -41,6 +41,11 @@ import {
 } from "./bot/helpers.js";
 import type { TelegramGetChat } from "./bot/types.js";
 import {
+  buildTelegramChannelAtomInput,
+  isTelegramChannelMemoryEnabled,
+  resolveTelegramChannelMemoryConfig,
+} from "./channel-memory.js";
+import {
   resolveTelegramConversationBaseSessionKey,
   resolveTelegramConversationRoute,
 } from "./conversation-route.js";
@@ -139,6 +144,8 @@ export const buildTelegramMessageContext = async ({
   loadFreshConfig,
   runtime,
   sessionRuntime,
+  recordChannelAtom,
+  channelMemoryConfig,
   upsertPairingRequest,
   sendChatActionHandler,
 }: BuildTelegramMessageContextParams): Promise<TelegramMessageContext | null> => {
@@ -479,6 +486,31 @@ export const buildTelegramMessageContext = async ({
 
   if (!(await ensureConfiguredBindingReady())) {
     return null;
+  }
+
+  const resolvedChannelMemoryConfig = resolveTelegramChannelMemoryConfig({
+    accountConfig: channelMemoryConfig,
+    groupConfig,
+    topicConfig,
+  });
+  if (
+    recordChannelAtom &&
+    isTelegramChannelMemoryEnabled({
+      config: resolvedChannelMemoryConfig,
+      chatId,
+      resolvedThreadId,
+    })
+  ) {
+    recordChannelAtom({
+      agentId: route.agentId,
+      ...buildTelegramChannelAtomInput({
+        accountId: account.accountId,
+        body: bodyResult.bodyText,
+        chatId,
+        msg,
+        resolvedThreadId,
+      }),
+    });
   }
 
   // Send the first typing cue before expensive context/session construction,

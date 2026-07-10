@@ -150,6 +150,18 @@ export const telegramChannelConfigUiHints = {
     label: "Telegram Media Group Flush (ms)",
     help: "Milliseconds to buffer Telegram albums/media groups before dispatching them as one inbound message. Default: 500.",
   },
+  channelMemory: {
+    label: "Telegram Channel Memory",
+    help: "Opt into storing inbound Telegram messages as supporting channel_context memory atoms. Default: false.",
+  },
+  "channelMemory.enabled": {
+    label: "Telegram Channel Memory Enabled",
+    help: "When true, accepted inbound Telegram messages are recorded as channel_context atoms for the routed agent.",
+  },
+  "channelMemory.allow": {
+    label: "Telegram Channel Memory Allowlist",
+    help: "Optional Telegram chat/topic allowlist. Entries may be chat IDs, chatId:topic:id, or telegram:<chat/topic> targets.",
+  },
   pollingStallThresholdMs: {
     label: "Telegram Polling Stall Threshold (ms)",
     help: "Milliseconds without completed Telegram getUpdates liveness before the polling watchdog restarts the polling runner. Default: 120000.",

@@ -429,6 +429,10 @@
       "types": "./dist/plugin-sdk/channel-activity-runtime.d.ts",
       "default": "./dist/plugin-sdk/channel-activity-runtime.js"
     },
+    "./plugin-sdk/channel-memory-runtime": {
+      "types": "./dist/plugin-sdk/channel-memory-runtime.d.ts",
+      "default": "./dist/plugin-sdk/channel-memory-runtime.js"
+    },
     "./plugin-sdk/concurrency-runtime": {
       "types": "./dist/plugin-sdk/concurrency-runtime.d.ts",
       "default": "./dist/plugin-sdk/concurrency-runtime.js"
