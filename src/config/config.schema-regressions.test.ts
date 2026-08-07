@@ -57,6 +57,40 @@ describe("config schema regressions", () => {
     expect(res.ok).toBe(true);
   });
 
+  it('accepts memorySearch source "channel_context"', () => {
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          memorySearch: {
+            sources: ["memory", "channel_context"],
+          },
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+  });
+
+  it("accepts memorySearch source weights", () => {
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          memorySearch: {
+            query: {
+              sourceWeights: {
+                memory: 1,
+                sessions: 0.9,
+                channel_context: 0.8,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+  });
+
   it("rejects local memorySearch GPU policy", () => {
     const res = validateConfigObject({
       agents: {

@@ -132,3 +132,49 @@ CREATE INDEX IF NOT EXISTS idx_memory_index_chunks_path
 
 CREATE INDEX IF NOT EXISTS idx_memory_index_chunks_source
   ON memory_index_chunks(source);
+
+CREATE TABLE IF NOT EXISTS memory_channel_atoms (
+  id TEXT NOT NULL PRIMARY KEY,
+  provider TEXT NOT NULL,
+  surface TEXT NOT NULL,
+  account_id TEXT,
+  conversation_id TEXT NOT NULL,
+  conversation_alias TEXT,
+  thread_id TEXT,
+  thread_key TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  sender_id TEXT,
+  sender_handle TEXT,
+  sender_display_name TEXT,
+  body TEXT NOT NULL,
+  received_at INTEGER NOT NULL,
+  ingested_at INTEGER NOT NULL,
+  authority TEXT NOT NULL,
+  migration_group_id TEXT,
+  alias_of TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_channel_atoms_source_message
+  ON memory_channel_atoms (
+    provider,
+    account_id,
+    conversation_id,
+    thread_key,
+    message_id
+  );
+
+CREATE INDEX IF NOT EXISTS idx_memory_channel_atoms_conversation
+  ON memory_channel_atoms (provider, conversation_id, received_at);
+
+CREATE TABLE IF NOT EXISTS memory_channel_atom_sync_state (
+  atom_id TEXT NOT NULL,
+  index_identity_hash TEXT NOT NULL,
+  indexed_at INTEGER NOT NULL,
+  chunk_path TEXT NOT NULL,
+  chunk_hash TEXT NOT NULL,
+  PRIMARY KEY (atom_id, index_identity_hash),
+  FOREIGN KEY (atom_id) REFERENCES memory_channel_atoms(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_channel_atom_sync_identity
+  ON memory_channel_atom_sync_state (index_identity_hash, indexed_at);

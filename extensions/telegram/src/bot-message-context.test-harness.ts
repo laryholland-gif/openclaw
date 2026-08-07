@@ -36,6 +36,8 @@ type BuildTelegramMessageContextForTestParams = {
   sendChatActionHandler?: BuildTelegramMessageContextParams["sendChatActionHandler"];
   runtime?: BuildTelegramMessageContextParams["runtime"];
   sessionRuntime?: BuildTelegramMessageContextParams["sessionRuntime"] | null;
+  recordChannelAtom?: BuildTelegramMessageContextParams["recordChannelAtom"];
+  channelMemoryConfig?: BuildTelegramMessageContextParams["channelMemoryConfig"];
   resolveGroupActivation?: BuildTelegramMessageContextParams["resolveGroupActivation"];
   resolveGroupRequireMention?: BuildTelegramMessageContextParams["resolveGroupRequireMention"];
   resolveTelegramGroupConfig?: BuildTelegramMessageContextParams["resolveTelegramGroupConfig"];
@@ -139,6 +141,8 @@ export async function buildTelegramMessageContextForTest(
       ...params.runtime,
     },
     sessionRuntime,
+    recordChannelAtom: params.recordChannelAtom,
+    channelMemoryConfig: params.channelMemoryConfig,
     account: { accountId: params.accountId ?? "default" } as never,
     historyLimit: params.historyLimit ?? 0,
     groupHistories: params.groupHistories ?? new Map(),

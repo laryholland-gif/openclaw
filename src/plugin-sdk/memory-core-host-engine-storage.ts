@@ -1,6 +1,8 @@
 /**
  * Public SDK subpath for memory host storage, indexing, and search primitives.
  */
+import type { MemorySource } from "../../packages/memory-host-sdk/src/engine-storage.js";
+
 export {
   buildFileEntry,
   buildMemoryReadResult,
@@ -26,6 +28,10 @@ export {
   MEMORY_INDEX_SOURCES_TABLE,
   MEMORY_INDEX_STATE_TABLE,
   MEMORY_INDEX_VECTOR_TABLE,
+  MEMORY_SOURCE_CHANNEL_CONTEXT,
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCE_SESSIONS,
+  MEMORY_SOURCES,
   normalizeExtraMemoryPaths,
   parseEmbedding,
   readMemoryFile,
@@ -38,7 +44,7 @@ export {
 } from "../../packages/memory-host-sdk/src/engine-storage.js";
 
 /** Origin bucket for memory search results exposed through the SDK. */
-export type MemorySource = "memory" | "sessions";
+export type { MemorySource } from "../../packages/memory-host-sdk/src/engine-storage.js";
 
 /** Normalized search hit shape returned by memory host searches. */
 export type MemorySearchResult = {

@@ -766,6 +766,69 @@ describe("memory search config", () => {
     expect(resolved?.sources).toEqual(["memory"]);
   });
 
+  it("keeps channel_context sources without session memory enabled", () => {
+    const cfg = asConfig({
+      agents: {
+        defaults: {
+          memorySearch: {
+            provider: "openai",
+            sources: ["memory", "sessions", "channel_context"],
+          },
+        },
+      },
+    });
+    const resolved = resolveMemorySearchConfig(cfg, "main");
+    expect(resolved?.sources).toEqual(["memory", "channel_context"]);
+  });
+
+  it("defaults source weights to prefer curated memory over high-volume sources", () => {
+    const resolved = resolveMemorySearchConfig(configWithDefaultProvider("openai"), "main");
+    expect(resolved?.query.sourceWeights).toEqual({
+      memory: 1,
+      sessions: 0.9,
+      channel_context: 0.8,
+    });
+  });
+
+  it("merges and clamps memorySearch source weights", () => {
+    const cfg = asConfig({
+      agents: {
+        defaults: {
+          memorySearch: {
+            provider: "openai",
+            query: {
+              sourceWeights: {
+                sessions: 0.7,
+                channel_context: 0.6,
+              },
+            },
+          },
+        },
+        list: [
+          {
+            id: "main",
+            default: true,
+            memorySearch: {
+              query: {
+                sourceWeights: {
+                  channel_context: 2,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const resolved = resolveMemorySearchConfig(cfg, "main");
+
+    expect(resolved?.query.sourceWeights).toEqual({
+      memory: 1,
+      sessions: 0.7,
+      channel_context: 1,
+    });
+  });
+
   it("allows session sources when experimental flag is enabled", () => {
     const cfg = asConfig({
       agents: {

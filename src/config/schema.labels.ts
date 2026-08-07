@@ -508,6 +508,11 @@ export const FIELD_LABELS: Record<string, string> = {
     "Force Reindex After Compaction",
   "agents.defaults.memorySearch.query.maxResults": "Memory Search Max Results",
   "agents.defaults.memorySearch.query.minScore": "Memory Search Min Score",
+  "agents.defaults.memorySearch.query.sourceWeights": "Memory Search Source Weights",
+  "agents.defaults.memorySearch.query.sourceWeights.memory": "Memory Source Weight",
+  "agents.defaults.memorySearch.query.sourceWeights.sessions": "Session Memory Source Weight",
+  "agents.defaults.memorySearch.query.sourceWeights.channel_context":
+    "Channel Context Source Weight",
   "agents.defaults.memorySearch.query.hybrid.enabled": "Memory Search Hybrid",
   "agents.defaults.memorySearch.query.hybrid.vectorWeight": "Memory Search Vector Weight",
   "agents.defaults.memorySearch.query.hybrid.textWeight": "Memory Search Text Weight",

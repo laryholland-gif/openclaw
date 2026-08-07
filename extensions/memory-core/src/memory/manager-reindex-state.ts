@@ -1,5 +1,7 @@
 // Memory Core plugin module implements manager reindex state behavior.
 import {
+  MEMORY_SOURCE_MEMORY,
+  MEMORY_SOURCES,
   hashText,
   normalizeExtraMemoryPaths,
   type MemorySource,
@@ -69,24 +71,22 @@ export function resolveMemoryIndexProviderIdentities(params: {
 
 export function resolveConfiguredSourcesForMeta(sources: Iterable<MemorySource>): MemorySource[] {
   const normalized = Array.from(sources)
-    .filter((source): source is MemorySource => source === "memory" || source === "sessions")
+    .filter((source): source is MemorySource => MEMORY_SOURCES.includes(source))
     .toSorted((left, right) => left.localeCompare(right));
-  return normalized.length > 0 ? normalized : ["memory"];
+  return normalized.length > 0 ? normalized : [MEMORY_SOURCE_MEMORY];
 }
 
 function normalizeMetaSources(meta: MemoryIndexMeta): MemorySource[] {
   if (!Array.isArray(meta.sources)) {
     // Backward compatibility for older indexes that did not persist sources.
-    return ["memory"];
+    return [MEMORY_SOURCE_MEMORY];
   }
   const normalized = Array.from(
     new Set(
-      meta.sources.filter(
-        (source): source is MemorySource => source === "memory" || source === "sessions",
-      ),
+      meta.sources.filter((source): source is MemorySource => MEMORY_SOURCES.includes(source)),
     ),
   ).toSorted((left, right) => left.localeCompare(right));
-  return normalized.length > 0 ? normalized : ["memory"];
+  return normalized.length > 0 ? normalized : [MEMORY_SOURCE_MEMORY];
 }
 
 function configuredMetaSourcesDiffer(params: {

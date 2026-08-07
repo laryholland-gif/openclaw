@@ -99,6 +99,13 @@ export type TelegramCustomCommand = {
   description: string;
 };
 
+export type TelegramChannelMemoryConfig = {
+  /** Store inbound Telegram messages as supporting channel_context memory atoms. Default: false. */
+  enabled?: boolean;
+  /** Optional chat/topic allowlist. Matches chat id, chatId:topic:id, or telegram:<chat id/topic>. */
+  allow?: string[];
+};
+
 export type TelegramAccountConfig = {
   /** Optional display name for this account (used in CLI/UI lists). */
   name?: string;
@@ -156,6 +163,8 @@ export type TelegramAccountConfig = {
   contextVisibility?: ContextVisibilityMode;
   /** Max group messages to keep as history context (0 disables). */
   historyLimit?: number;
+  /** Opt-in Telegram channel-context memory capture for this account. */
+  channelMemory?: TelegramChannelMemoryConfig;
   /** Max DM turns to keep as history context. */
   dmHistoryLimit?: number;
   /** Per-DM config overrides keyed by user ID. */
@@ -263,6 +272,8 @@ export type TelegramDmConfig = {
 
 export type TelegramTopicConfig = {
   requireMention?: boolean;
+  /** Per-topic override for Telegram channel-context memory capture. */
+  channelMemory?: TelegramChannelMemoryConfig;
   /** Emit internal message hooks for mention-skipped topic messages. */
   ingest?: boolean;
   /** Per-topic override for group message policy (open|disabled|allowlist). */
@@ -287,6 +298,8 @@ export type TelegramTopicConfig = {
 
 export type TelegramGroupConfig = {
   requireMention?: boolean;
+  /** Per-group override for Telegram channel-context memory capture. */
+  channelMemory?: TelegramChannelMemoryConfig;
   /** Emit internal message hooks for mention-skipped group messages. */
   ingest?: boolean;
   /** Per-group override for group message policy (open|disabled|allowlist). */
@@ -324,6 +337,8 @@ export type AutoTopicLabelConfig =
 export type TelegramDirectConfig = {
   /** Per-DM override for DM message policy (open|disabled|allowlist). */
   dmPolicy?: DmPolicy;
+  /** Per-DM override for Telegram channel-context memory capture. */
+  channelMemory?: TelegramChannelMemoryConfig;
   /** @deprecated Use bot getMe.has_topics_enabled; doctor removes this key. */
   threadReplies?: TelegramDmThreadReplies;
   /** Optional tool policy overrides for this DM. */

@@ -1,6 +1,7 @@
 // Telegram plugin module implements bot deps behavior.
 import { recordChannelActivity } from "openclaw/plugin-sdk/channel-activity-runtime";
 import { buildChannelInboundEventContext } from "openclaw/plugin-sdk/channel-inbound";
+import { recordChannelAtom } from "openclaw/plugin-sdk/channel-memory-runtime";
 import {
   createChannelMessageReplyPipeline,
   deliverInboundReplyWithMessageSendContext,
@@ -44,6 +45,7 @@ export type TelegramBotDeps = {
   readSessionUpdatedAt?: typeof readSessionUpdatedAt;
   readAmbientTranscriptWatermark?: typeof readAmbientTranscriptWatermark;
   resolveAmbientTranscriptWatermarkKey?: typeof resolveAmbientTranscriptWatermarkKey;
+  recordChannelAtom?: typeof recordChannelAtom;
   recordInboundSession?: typeof recordInboundSession;
   recordChannelActivity?: typeof recordChannelActivity;
   resolveInboundLastRouteSessionKey?: typeof resolveInboundLastRouteSessionKey;
@@ -98,6 +100,9 @@ export const defaultTelegramBotDeps: TelegramBotDeps = {
   },
   get recordInboundSession() {
     return recordInboundSession;
+  },
+  get recordChannelAtom() {
+    return recordChannelAtom;
   },
   get recordChannelActivity() {
     return recordChannelActivity;

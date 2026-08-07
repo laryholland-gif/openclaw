@@ -2,6 +2,7 @@
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
 import type { ChatType } from "../channels/chat-type.js";
 import type { SafeBinProfileFixture } from "../infra/exec-safe-bin-policy.js";
+import type { MemorySource } from "../memory-host-sdk/engine-storage.js";
 import type { AgentModelConfig } from "./types.agents-shared.js";
 import type { AgentElevatedAllowFromConfig, SessionSendPolicyAction } from "./types.base.js";
 import type { MemoryQmdIndexPath } from "./types.memory.js";
@@ -437,7 +438,7 @@ export type MemorySearchConfig = {
   /** Enable vector memory search (default: true). */
   enabled?: boolean;
   /** Sources to index and search (default: ["memory"]). */
-  sources?: Array<"memory" | "sessions">;
+  sources?: MemorySource[];
   /** Extra paths to include in memory search (directories or .md files). */
   extraPaths?: string[];
   /** Optional QMD-specific extra collections for cross-agent search. */
@@ -558,6 +559,8 @@ export type MemorySearchConfig = {
   query?: {
     maxResults?: number;
     minScore?: number;
+    /** Per-source ranking multipliers applied before minScore filtering. Defaults: memory=1, sessions=0.9, channel_context=0.8. */
+    sourceWeights?: Partial<Record<MemorySource, number>>;
     hybrid?: {
       /** Enable hybrid BM25 + vector search (default: true). */
       enabled?: boolean;

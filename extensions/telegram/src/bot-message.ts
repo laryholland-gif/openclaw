@@ -160,6 +160,8 @@ export const createTelegramMessageProcessor = (deps: TelegramMessageProcessorDep
       loadFreshConfig,
       runtime: contextRuntime,
       sessionRuntime,
+      recordChannelAtom: telegramDeps.recordChannelAtom,
+      channelMemoryConfig: telegramCfg.channelMemory,
       upsertPairingRequest: telegramDeps.upsertChannelPairingRequest,
     });
     if (!context) {

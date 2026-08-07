@@ -1206,7 +1206,7 @@ export const FIELD_HELP: Record<string, string> = {
   "agents.defaults.memorySearch.enabled":
     "Master toggle for memory search indexing and retrieval behavior on this agent profile. Keep enabled for semantic recall, and disable when you want fully stateless responses.",
   "agents.defaults.memorySearch.sources":
-    'Chooses which sources are indexed: "memory" reads MEMORY.md + memory files, and "sessions" includes transcript history. Keep ["memory"] unless you need recall from prior chat transcripts.',
+    'Chooses which sources are indexed: "memory" reads MEMORY.md + memory files, "sessions" includes transcript history, and "channel_context" reserves group/channel atom recall. Keep ["memory"] unless you need another source.',
   "agents.defaults.memorySearch.extraPaths":
     "Adds extra directories or .md files to the memory index beyond default memory files. Use this when key reference docs live elsewhere in your repo; when multimodal memory is enabled, matching image/audio files under these paths are also eligible for indexing.",
   "agents.defaults.memorySearch.qmd":
@@ -1277,6 +1277,14 @@ export const FIELD_HELP: Record<string, string> = {
     "Maximum number of memory hits returned from search before downstream reranking and prompt injection. Raise for broader recall, or lower for tighter prompts and faster responses.",
   "agents.defaults.memorySearch.query.minScore":
     "Minimum relevance score threshold for including memory results in final recall output. Increase to reduce weak/noisy matches, or lower when you need more permissive retrieval.",
+  "agents.defaults.memorySearch.query.sourceWeights":
+    "Per-source ranking multipliers applied before minScore filtering. Keep curated memory at full weight and reduce high-volume sources such as channel_context so they do not overpower durable memory.",
+  "agents.defaults.memorySearch.query.sourceWeights.memory":
+    "Ranking multiplier for curated MEMORY.md and memory/*.md hits. Default: 1.",
+  "agents.defaults.memorySearch.query.sourceWeights.sessions":
+    "Ranking multiplier for indexed session transcript hits. Default: 0.9.",
+  "agents.defaults.memorySearch.query.sourceWeights.channel_context":
+    "Ranking multiplier for channel context atom hits. Default: 0.8.",
   "agents.defaults.memorySearch.query.hybrid.enabled":
     "Combines BM25 keyword matching with vector similarity for better recall on mixed exact + semantic queries. Keep enabled unless you are isolating ranking behavior for troubleshooting.",
   "agents.defaults.memorySearch.query.hybrid.vectorWeight":

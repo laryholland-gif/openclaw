@@ -12,6 +12,7 @@ import {
   closeOpenClawAgentDatabasesForTest,
   closeOpenClawStateDatabaseForTest,
   openOpenClawAgentDatabase,
+  upsertChannelAtom,
 } from "openclaw/plugin-sdk/sqlite-runtime-testing";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./test-runtime-mocks.js";
@@ -352,7 +353,7 @@ describe("memory index", () => {
 
   function createCfg(params: {
     extraPaths?: string[];
-    sources?: Array<"memory" | "sessions">;
+    sources?: Array<"memory" | "sessions" | "channel_context">;
     sessionMemory?: boolean;
     provider?: string;
     fallback?: "none" | "gemini" | "fallback-provider";
@@ -368,6 +369,7 @@ describe("memory index", () => {
     vectorEnabled?: boolean;
     cacheEnabled?: boolean;
     minScore?: number;
+    sourceWeights?: Partial<Record<"memory" | "sessions" | "channel_context", number>>;
     onSearch?: boolean;
     hybrid?: { enabled: boolean; vectorWeight?: number; textWeight?: number };
   }): TestCfg {
@@ -392,6 +394,7 @@ describe("memory index", () => {
               : undefined,
             query: {
               minScore: params.minScore ?? 0,
+              sourceWeights: params.sourceWeights,
               hybrid: params.hybrid ?? { enabled: false },
             },
             cache: params.cacheEnabled ? { enabled: true } : undefined,
@@ -627,6 +630,114 @@ describe("memory index", () => {
       role: "agent",
       agent_id: "main",
     });
+  });
+
+  it("indexes channel context atoms as a virtual memory source", async () => {
+    const agentDb = openOpenClawAgentDatabase({ agentId: "main" });
+    const atomId = upsertChannelAtom(agentDb, {
+      provider: "telegram",
+      surface: "telegram",
+      accountId: null,
+      conversationId: "chat-42",
+      conversationAlias: "NODECHAT",
+      threadId: null,
+      messageId: "msg-9001",
+      senderId: "user-7",
+      senderHandle: "lary",
+      senderDisplayName: "Lary",
+      body: "Project Nebula should remember the ORBIT-10 channel decision.",
+      receivedAt: Date.parse("2026-07-09T04:30:00.000Z"),
+      ingestedAt: Date.parse("2026-07-09T04:31:00.000Z"),
+    });
+    closeOpenClawAgentDatabasesForTest();
+
+    const manager = await getFreshManager(
+      createCfg({
+        sources: ["channel_context"],
+        provider: "none",
+        hybrid: { enabled: true, vectorWeight: 0, textWeight: 1 },
+      }),
+    );
+    try {
+      await manager.sync({ reason: "test", force: true });
+
+      const results = await manager.search("ORBIT-10", {
+        sources: ["channel_context"],
+      });
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        source: "channel_context",
+      });
+      expect(results[0]?.path).toMatch(
+        /^channel_context\/telegram\/chat-42\/none\/msg-9001-[a-f0-9]+\.md$/u,
+      );
+      expect(results[0]?.snippet).toContain("ORBIT-10 channel decision");
+
+      const db = Reflect.get(manager, "db") as DatabaseSync;
+      const syncRow = db
+        .prepare(
+          `SELECT atom_id, chunk_path, chunk_hash
+           FROM memory_channel_atom_sync_state
+           WHERE atom_id = ?`,
+        )
+        .get(atomId) as { atom_id?: string; chunk_path?: string; chunk_hash?: string } | undefined;
+      expect(syncRow?.atom_id).toBe(atomId);
+      expect(syncRow?.chunk_path).toBe(results[0]?.path);
+      expect(syncRow?.chunk_hash).toBeTruthy();
+    } finally {
+      await manager.close?.();
+    }
+  });
+
+  it("applies source weights before returning mixed source rankings", async () => {
+    await fs.writeFile(
+      path.join(memoryDir, "2026-07-09.md"),
+      "# Log\nProject Nebula ORBIT-10 source authority decision.",
+    );
+
+    const agentDb = openOpenClawAgentDatabase({ agentId: "main" });
+    upsertChannelAtom(agentDb, {
+      provider: "telegram",
+      surface: "telegram",
+      accountId: null,
+      conversationId: "chat-42",
+      conversationAlias: "NODECHAT",
+      threadId: null,
+      messageId: "msg-source-weight",
+      senderId: "user-7",
+      senderHandle: "lary",
+      senderDisplayName: "Lary",
+      body: "Project Nebula ORBIT-10 source authority decision.",
+      receivedAt: Date.parse("2026-07-09T04:30:00.000Z"),
+      ingestedAt: Date.parse("2026-07-09T04:31:00.000Z"),
+    });
+    closeOpenClawAgentDatabasesForTest();
+
+    const manager = await getFreshManager(
+      createCfg({
+        sources: ["memory", "channel_context"],
+        provider: "none",
+        hybrid: { enabled: true, vectorWeight: 0, textWeight: 1 },
+        sourceWeights: { memory: 1, channel_context: 0.2 },
+      }),
+    );
+    try {
+      await manager.sync({ reason: "test", force: true });
+
+      const results = await manager.search("Project Nebula ORBIT-10 source authority decision", {
+        maxResults: 5,
+        minScore: 0,
+      });
+      const memoryHit = results.find((entry) => entry.source === "memory");
+      const channelHit = results.find((entry) => entry.source === "channel_context");
+      expect(memoryHit).toBeTruthy();
+      expect(channelHit).toBeTruthy();
+      expect(results[0]?.source).toBe("memory");
+      expect(memoryHit!.score).toBeGreaterThan(channelHit!.score);
+      expect(channelHit!.score).toBeLessThan(0.25);
+    } finally {
+      await manager.close?.();
+    }
   });
 
   it("batches dirty memory chunks across files", async () => {
@@ -2311,5 +2422,4 @@ describe("memory index", () => {
       restoreMemoryIndexStateDir();
     }
   });
-
 });

@@ -156,9 +156,18 @@ const TelegramCustomCommandConfig = {
   pattern: TelegramCommandNamePattern,
   patternDescription: "use a-z, 0-9, underscore; max 32 chars",
 } as const;
+
+const TelegramChannelMemorySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    allow: z.array(z.string()).optional(),
+  })
+  .strict();
+
 export const TelegramTopicSchema = z
   .object({
     requireMention: z.boolean().optional(),
+    channelMemory: TelegramChannelMemorySchema.optional(),
     ingest: z.boolean().optional(),
     disableAudioPreflight: z.boolean().optional(),
     groupPolicy: GroupPolicySchema.optional(),
@@ -175,6 +184,7 @@ export const TelegramTopicSchema = z
 export const TelegramGroupSchema = z
   .object({
     requireMention: z.boolean().optional(),
+    channelMemory: TelegramChannelMemorySchema.optional(),
     ingest: z.boolean().optional(),
     disableAudioPreflight: z.boolean().optional(),
     groupPolicy: GroupPolicySchema.optional(),
@@ -205,6 +215,7 @@ const AutoTopicLabelSchema = z
 export const TelegramDirectSchema = z
   .object({
     dmPolicy: DmPolicySchema.optional(),
+    channelMemory: TelegramChannelMemorySchema.optional(),
     tools: ToolPolicySchema,
     toolsBySender: ToolPolicyBySenderSchema,
     skills: z.array(z.string()).optional(),
@@ -279,6 +290,7 @@ export const TelegramAccountSchemaBase = z
     mentionPatterns: MentionPatternsPolicySchema.optional(),
     contextVisibility: ContextVisibilityModeSchema.optional(),
     historyLimit: z.number().int().min(0).optional(),
+    channelMemory: TelegramChannelMemorySchema.optional(),
     dmHistoryLimit: z.number().int().min(0).optional(),
     dms: z.record(z.string(), DmConfigSchema.optional()).optional(),
     direct: z.record(z.string(), TelegramDirectSchema.optional()).optional(),
